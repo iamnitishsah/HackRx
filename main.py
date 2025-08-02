@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import requests
 import tempfile
-from typing import List, Dict, Any, Optional
+from typing import List, Any
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -18,8 +18,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
-
-# Load environment variables
 load_dotenv()
 
 # Configuration values
@@ -45,11 +43,11 @@ class Document:
         self.page_content = page_content
         self.metadata = metadata or {}
 
-class HackrxRequest(BaseModel):
+class PolicyQuoraRequest(BaseModel):
     documents: HttpUrl
     questions: List[str]
 
-class HackrxResponse(BaseModel):
+class PolicyQuoraResponse(BaseModel):
     answers: List[str]
 
 class PDFProcessor:
@@ -131,7 +129,6 @@ class PineconeHandler:
 class PolicyQAEngine:
     @staticmethod
     async def answer_questions(questions: List[str], embedder, index, llm_model) -> List[str]:
-        # Embed all questions
         question_embeddings = embedder.embed_documents(questions)
 
         # Retrieve documents concurrently for each question
@@ -167,7 +164,6 @@ class PolicyQAEngine:
             for q, docs in zip(questions, relevant_docs)
         ]
 
-        # Call LLM for answers (rate limited)
         semaphore = asyncio.Semaphore(5)
         async def llm_call(prompt: str) -> str:
             async with semaphore:
@@ -182,7 +178,6 @@ class PolicyQAEngine:
 
     @staticmethod
     def prepare_prompt(question: str, docs: List[Document]) -> str:
-        # Build LLM prompt using document chunks
         prompt = f"""You are an insurance policy expert. Answer this question using ONLY the information provided below.
 
 Question: {question}
@@ -212,20 +207,19 @@ async def load_components():
     llm = GoogleGenerativeAI(
         model=LLM_MODEL,
         temperature=0.0,
+        max_output_tokens=1024,
         google_api_key=GOOGLE_API_KEY,
     )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Load all required components
     await load_components()
     yield
-    # Shutdown: Print shutdown message only
     print("Shutting down...")
 
 app = FastAPI(
-    title="Super Optimized Insurance Policy Assistant API",
-    description="Maximum performance API for insurance policy Q&A",
+    title="PolicyQuora: Insurance Policy Q&A API",
+    description="Super-fast, accurate API for insurance document Q&A",
     version="3.0.0",
     lifespan=lifespan
 )
@@ -249,17 +243,17 @@ def ingest_pdf_document(pdf_url: str) -> bool:
             detail=f"Failed to ingest document: {str(e)}"
         )
 
-@app.post("/hackrx/run", response_model=HackrxResponse)
-async def super_optimized_policy_qa(request: HackrxRequest):
+@app.post("/hackrx/run", response_model=PolicyQuoraResponse)
+async def policyquora_qa(request: PolicyQuoraRequest):
     """
-    API endpoint for uploading a policy PDF and asking questions.
+    API endpoint for uploading a policy PDF and asking questions via PolicyQuora.
     """
     try:
         ingest_pdf_document(str(request.documents))
         answers = await PolicyQAEngine.answer_questions(
             request.questions, embedder, pinecone_index, llm
         )
-        return HackrxResponse(answers=answers)
+        return PolicyQuoraResponse(answers=answers)
     except HTTPException:
         raise
     except Exception as e:
