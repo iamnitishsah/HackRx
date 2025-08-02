@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+requests
+langchain
+langchain-community
+langchain-text-splitters
+langchain-google-genai
+langchain-pinecone
+pinecone-client
+pypdf
+unstructured
+google-generativeai
